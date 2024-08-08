@@ -3,6 +3,7 @@ using Boostlingo.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json;
+using System.Reflection;
 
 namespace Boostlingo
 {
@@ -33,7 +34,7 @@ namespace Boostlingo
             }
             catch (Exception ex)
             {
-                throw new Exception("Error fetching JSON data:", ex);
+                throw new Exception($"Error fetching JSON data: {ex}");
             }
 
             if (string.IsNullOrEmpty(response))
@@ -58,17 +59,19 @@ namespace Boostlingo
             // Insert into database table
             await databaseService.WriteDummyDataAsync(processedModels);
 
+            // Read from database table
             var dbResponse = await databaseService.ReadDummyDataAsync();
-            if (dbResponse != null && dbResponse.Count > 0)
+            if (dbResponse == null || dbResponse.Count == 0)
             {
-                Console.WriteLine($"Retrieved {dbResponse.Count} records from DB");
-                
-                foreach (var model in dbResponse)
-                {
-                    Console.WriteLine(model.FirstName + "\n");
-                }
+                throw new Exception($"Error reading data from {tableName} table.");
             }
 
+            // Sort data by First/Last name and output to console
+            var sortedModels = dbResponse.OrderBy(model => model.LastName)
+                         .ThenBy(model => model.FirstName)
+                         .ToList();
+
+            sortedModels.ForEach(model => Console.WriteLine($"{model.LastName}, {model.FirstName}"));
 
         }
 
