@@ -1,32 +1,24 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Boostlingo.Models;
+﻿using Boostlingo.Models;
 using Microsoft.Extensions.Configuration;
-using Microsoft.VisualBasic;
 using Npgsql;
-
 
 namespace Boostlingo.Services
 {
-    public class DatabaseService
+    public class DatabaseService : IDatabaseService
     {
-        //private readonly string _connectionString;
+        private readonly IConfiguration _configuration;
+        private string _connectionString;
 
-        //public DatabaseService(IConfiguration configuration)
-        //{
-        //    _connectionString = configuration.GetConnectionString("DefaultConnection");
-        //}
+        public DatabaseService(IConfiguration configuration)
+        {
+            _configuration = configuration;
+            _connectionString = configuration["Postgres:ConnectionString"];
+        }
 
         public async Task WriteDummyDataAsync(List<DummyModel> models)
         {
-            // TODO store this in config
-            var _connectionString = "Host=localhost;Port=5432;Username=test-user;Password=boostlingo;Database=test-db";
-
-            // Open a new connection
-            using var connection = new NpgsqlConnection(_connectionString);
+            var connectionString = _configuration["Postgres:ConnectionString"];
+            using var connection = new NpgsqlConnection(connectionString);
             await connection.OpenAsync();
 
             foreach (var model in models)
@@ -51,17 +43,14 @@ namespace Boostlingo.Services
         {
             var models = new List<DummyModel>();
 
-            // TODO store this in config
-            var _connectionString = "Host=localhost;Port=5432;Username=test-user;Password=boostlingo;Database=test-db";
-
-            using (var connection = new NpgsqlConnection(_connectionString))
+            using var connection = new NpgsqlConnection(_connectionString);
             {
                 await connection.OpenAsync();
 
                 var commandText = "SELECT id, firstname, lastname, language, bio, version FROM DummyData";
-                using (var command = new NpgsqlCommand(commandText, connection))
+                using var command = new NpgsqlCommand(commandText, connection);
                 {
-                    using (var reader = await command.ExecuteReaderAsync())
+                    using var reader = await command.ExecuteReaderAsync();
                     {
                         while (await reader.ReadAsync())
                         {
@@ -86,14 +75,11 @@ namespace Boostlingo.Services
 
         public async Task ClearTableAsync(string tableName)
         {
-            // TODO store this in config
-            var _connectionString = "Host=localhost;Port=5432;Username=test-user;Password=boostlingo;Database=test-db";
-
-            using (var connection = new NpgsqlConnection(_connectionString))
+            using var connection = new NpgsqlConnection(_connectionString);
             {
                 await connection.OpenAsync();
                 var sql = $"DELETE FROM {tableName}";
-                using (var command = new NpgsqlCommand(sql, connection))
+                using var command = new NpgsqlCommand(sql, connection);
                 {
                     await command.ExecuteNonQueryAsync();
                 }

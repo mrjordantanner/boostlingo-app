@@ -1,6 +1,6 @@
 ﻿namespace Boostlingo.Services
 {
-    public class JsonDataService
+    public class JsonDataService : IJsonDataService
     {
         private readonly HttpClient _httpClient;
 
