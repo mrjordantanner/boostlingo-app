@@ -1,5 +1,4 @@
-﻿
-namespace boostlingo
+﻿namespace Boostlingo.Services
 {
     public class JsonDataService
     {
