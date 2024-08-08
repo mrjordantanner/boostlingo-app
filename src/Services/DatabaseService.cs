@@ -4,6 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Boostlingo.Models;
+using Microsoft.Extensions.Configuration;
+using Microsoft.VisualBasic;
 using Npgsql;
 
 
@@ -13,21 +15,20 @@ namespace Boostlingo.Services
     {
         //private readonly string _connectionString;
 
-        //public DatabaseService(string connectionString)
+        //public DatabaseService(IConfiguration configuration)
         //{
-        //    _connectionString = connectionString;
+        //    _connectionString = configuration.GetConnectionString("DefaultConnection");
         //}
 
-        public async Task InsertDataAsync(List<DummyModel> models)
+        public async Task WriteDummyDataAsync(List<DummyModel> models)
         {
             // TODO store this in config
             var _connectionString = "Host=localhost;Port=5432;Username=test-user;Password=boostlingo;Database=test-db";
 
             // Open a new connection
-            var connection = new NpgsqlConnection(_connectionString);
+            using var connection = new NpgsqlConnection(_connectionString);
             await connection.OpenAsync();
 
-            // Write each model to the database
             foreach (var model in models)
             {
                 var sqlString = "INSERT INTO " +
@@ -43,6 +44,59 @@ namespace Boostlingo.Services
                 insertCommand.Parameters.AddWithValue("version", model.Version);
 
                 await insertCommand.ExecuteNonQueryAsync();
+            }
+        }
+
+        public async Task<List<DummyModel>> ReadDummyDataAsync()
+        {
+            var models = new List<DummyModel>();
+
+            // TODO store this in config
+            var _connectionString = "Host=localhost;Port=5432;Username=test-user;Password=boostlingo;Database=test-db";
+
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                await connection.OpenAsync();
+
+                var commandText = "SELECT id, firstname, lastname, language, bio, version FROM DummyData";
+                using (var command = new NpgsqlCommand(commandText, connection))
+                {
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            var model = new DummyModel
+                            {
+                                Id = reader["id"].ToString(),
+                                FirstName = reader["firstname"].ToString(),
+                                LastName = reader["lastname"].ToString(),
+                                Language = reader["language"].ToString(),
+                                Bio = reader["bio"].ToString(),
+                                Version = reader.GetDouble(reader.GetOrdinal("version"))
+                            };
+
+                            models.Add(model);
+                        }
+                    }
+                }
+            }
+
+            return models;
+        }
+
+        public async Task ClearTableAsync(string tableName)
+        {
+            // TODO store this in config
+            var _connectionString = "Host=localhost;Port=5432;Username=test-user;Password=boostlingo;Database=test-db";
+
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                await connection.OpenAsync();
+                var sql = $"DELETE FROM {tableName}";
+                using (var command = new NpgsqlCommand(sql, connection))
+                {
+                    await command.ExecuteNonQueryAsync();
+                }
             }
         }
     }
