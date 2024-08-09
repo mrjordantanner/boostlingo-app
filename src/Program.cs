@@ -2,6 +2,7 @@
 using Boostlingo.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 
 namespace Boostlingo
@@ -17,10 +18,7 @@ namespace Boostlingo
             var dataProcessor = serviceProvider.GetRequiredService<DataProcessor>();
 
             await dataProcessor.ProcessData();
-
-            Console.WriteLine("Operation has completed successfully and will now exit.");
             Environment.Exit(0);
-
         }
 
         private static void ConfigureServices(IServiceCollection services)
@@ -31,7 +29,11 @@ namespace Boostlingo
                 .AddSingleton(configuration)
                 .AddTransient<DataProcessor>()
                 .AddTransient<IJsonDataService, JsonDataService>()
-                .AddTransient<IDatabaseService, DatabaseService>();
+                .AddTransient<IDatabaseService, DatabaseService>()
+                .AddLogging(builder =>
+                {
+                    builder.AddConsole();
+                });
         }
 
         private static IConfiguration LoadConfiguration()
@@ -41,7 +43,5 @@ namespace Boostlingo
                 .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
                 .Build();
         }
-
-
     }
 }

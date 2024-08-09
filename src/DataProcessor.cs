@@ -1,8 +1,9 @@
 ﻿using Boostlingo.Models;
 using Boostlingo.Services;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using System.ComponentModel;
+
 
 namespace Boostlingo
 {
@@ -11,46 +12,55 @@ namespace Boostlingo
         private readonly IConfiguration _configuration;
         private readonly IJsonDataService _jsonDataService;
         private readonly IDatabaseService _databaseService;
+        private readonly ILogger<DataProcessor> _logger;
 
         public DataProcessor(
-            IConfiguration configuration, 
-            IJsonDataService jsonDataService, 
-            IDatabaseService databaseService)
+            IConfiguration configuration,
+            IJsonDataService jsonDataService,
+            IDatabaseService databaseService,
+            ILogger<DataProcessor> logger)
         {
             _configuration = configuration;
             _jsonDataService = jsonDataService;
             _databaseService = databaseService;
+            _logger = logger;
         }
 
         public async Task ProcessData()
         {
-            Console.WriteLine("Starting data processing.");
+            _logger.LogInformation("Starting data processing.");
 
-            var jsonDataUrl = _configuration["AppSettings:JsonDataUrl"];
-            var tableName = _configuration["Postgres:TableName"];
+            var dataUrl = GetConfigProperty("AppSettings:DataUrl");
+            var tableName = GetConfigProperty("Postgres:TableName");
+
+            if (string.IsNullOrEmpty(dataUrl) || string.IsNullOrEmpty(tableName)) return;
 
             string response;
             try
             {
-                response = await _jsonDataService.GetJsonDataAsync(jsonDataUrl);
+                response = await _jsonDataService.GetJsonDataAsync(dataUrl);
+
+                if (string.IsNullOrEmpty(response))
+                {
+                    _logger.LogError("Response from JsonDataService was null or empty.");
+                    return;
+                }
             }
             catch (Exception ex)
             {
-                throw new Exception($"Error fetching JSON data: {ex}");
-            }
-            if (string.IsNullOrEmpty(response))
-            {
-                throw new Exception("Response was null or empty.");
+                _logger.LogError("Error fetching JSON data: {ex}", ex);
+                return;
             }
 
-            // Deserialize json into List of DummyModels
+            // Deserialize json
             var models = JsonConvert.DeserializeObject<List<DummyModel>>(response);
             if (models == null || models.Count == 0)
             {
-                throw new Exception("Error deserializing JSON data.");
+                _logger.LogError("Error deserializing JSON data.");
+                return;
             }
 
-            var processedModels = SplitNames(models);
+            var processedModels = SplitName(models);
 
             // Clear table (for testing purposes), then Write Data
             await _databaseService.ClearTableAsync(tableName);
@@ -60,18 +70,21 @@ namespace Boostlingo
             var dbResponse = await _databaseService.ReadDummyDataAsync();
             if (dbResponse == null || dbResponse.Count == 0)
             {
-                throw new Exception($"Error reading data from {tableName} table.");
+                _logger.LogError("Error reading data from table: {tableName}.", tableName);
+                return;
             }
 
-            // Sort data by Last and then First name and output to console
-            var sortedModels = dbResponse.OrderBy(model => model.LastName)
+            // Sort and print data
+            dbResponse.OrderBy(model => model.LastName)
                          .ThenBy(model => model.FirstName)
-                         .ToList();
+                         .ToList()
+                         .ForEach(model => Console.WriteLine($"{model.LastName}, {model.FirstName}"));
 
-            sortedModels.ForEach(model => Console.WriteLine($"{model.LastName}, {model.FirstName}"));
+            _logger.LogInformation("Operation completed successfully. Application will now exit.");
         }
 
-        private static List<DummyModel> SplitNames(List<DummyModel> models)
+        // Helper methods
+        private static List<DummyModel> SplitName(List<DummyModel> models)
         {
             foreach (var model in models)
             {
@@ -83,6 +96,19 @@ namespace Boostlingo
                 }
             }
             return models;
+        }
+
+        private string GetConfigProperty(string propertyString)
+        {
+            var config = _configuration[propertyString];
+            if (string.IsNullOrEmpty(config))
+            {
+                var errorMessage = $"Configuration error: {propertyString} not found.";
+
+                _logger.LogError(errorMessage);
+                throw new Exception(errorMessage);
+            }
+            return config;
         }
 
 
