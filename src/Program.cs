@@ -17,8 +17,9 @@ namespace Boostlingo
             var serviceProvider = services.BuildServiceProvider();
             var dataProcessor = serviceProvider.GetRequiredService<DataProcessor>();
 
-            await dataProcessor.ProcessData();
-            Environment.Exit(0);
+            var success = await dataProcessor.ProcessData();
+            var exitCode = success ? 0 : 1;
+            Environment.Exit(exitCode);
         }
 
         private static void ConfigureServices(IServiceCollection services)
